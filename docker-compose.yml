@@ -1,0 +1,82 @@
+version: "3.9"
+services:
+
+  hiking_shop:
+    build: /hicking-shop/.
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: hiking_shop_db
+      DB_PORT: 5432
+      DB_NAME: hiking_shop
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      TOPIC_NAME: send-order
+    depends_on:
+      hiking_shop_db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - hiking_shop_db_network
+
+  hiking_shop-consumer:
+    build: /hiking-app-consumer/.
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: jdbc:postgresql://hiking_shop_db:5432/hiking_shop
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      KAFKA_TOPIC: send-order
+      KAFKA_BOOTSTRAP_SERVERS: kafka_broker:9092
+    depends_on:
+      hiking_shop_db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      
+    networks:
+      - hiking_shop_db_network
+
+  hiking_shop_db:
+    image: postgres
+    environment:
+      POSTGRES_DB: hiking_shop
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - 5440:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - hiking_shop_data:/var/lib/postgresql/data
+    networks:
+      - hiking_shop_db_network
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka_broker
+    ports:
+      - "9094:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka_broker:9093"
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_broker:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - hiking_shop_db_network
+
+volumes:
+  hiking_shop_data:
+networks:
+    hiking_shop_db_network:
