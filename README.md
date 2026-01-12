@@ -15,6 +15,8 @@ The main objective of this project is to demonstrate the development of robust b
 * Asynchronous processing
 * Design patterns
 * REST architecture
+* Docker
+* Docker compose
 
 ## Main functionalities
 
